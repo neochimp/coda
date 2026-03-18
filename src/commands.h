@@ -6,5 +6,6 @@ int cmd_add(int argc, char *argv[]);
 int cmd_search(int argc, char *argv[]);
 int cmd_edit(int argc, char *argv[]);
 int cmd_remove(int id);
+int cmd_init(char *dbName);
 
 #endif
