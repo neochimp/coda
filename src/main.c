@@ -26,9 +26,7 @@ int main(int argc, char *argv[]){
   
 
   //example quickstart from documentation
-  
-
-
+/*
   sqlite3 *db;
   char *zErrMsg = 0;
   int rc;
@@ -49,7 +47,7 @@ int main(int argc, char *argv[]){
     sqlite3_free(zErrMsg);
   }
   sqlite3_close(db);
-
+*/
 
   return 0;
 }
