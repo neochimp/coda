@@ -1,0 +1,9 @@
+#!/bin/bash
+./tiny $1 $2 $3
+if [ $? -ne 0 ]; then
+  exit 1
+fi
+
+./build/bin.exe "$@"
+
+
