@@ -1,0 +1,4 @@
+PROJECT src
+MAIN main.c
+INCLUDE vendor/SQLite/include
+SOURCE vendor/SQLite/include
