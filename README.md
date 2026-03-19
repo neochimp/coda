@@ -1,3 +1,9 @@
+<h1 align="center">
+    <picture>
+      <img height="300px" style="margin: 0; padding: 0" src="assets/logo-512x512.png">
+    </picture>
+</h1>
+
 Coda - A personal database for music collectors
 =========
 

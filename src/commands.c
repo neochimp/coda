@@ -14,11 +14,11 @@
 void usage_info(const char *prog){
   fprintf(stderr,
     "Usage:\n"
+    " %s init <database name>.db\n"
     " %s add [-a album] [-A artist] [-d date]\n"
     " %s edit <id> [-a album] [-A artist] [-d date]\n"
     " %s search [-a album] [-A artist]\n"
-    " %s init <database name>.db\n"
-    " %s list\n"
+    " %s list [-a, --album] [-A, --artist] [-d, --Date] \n"
     " %s remove <id>\n",
     prog, prog, prog, prog, prog, prog
   );
