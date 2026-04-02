@@ -160,7 +160,7 @@ int cmd_init(char* dbName){
   }
 
   const char *sql_create_table =  "CREATE TABLE IF NOT EXISTS Albums("
-                                  "AlbumID INTEGER PRIMARY KEY AUTOINCREMENT, "
+                                  "ID INTEGER PRIMARY KEY AUTOINCREMENT, "
                                   "Title TEXT NOT NULL, "
                                   "Artist TEXT NOT NULL, "
                                   "Date DATE);";
@@ -262,15 +262,28 @@ int cmd_add(int argc, char *argv[]){
   return 0;
 }
 
-//sample function from the sqlite documentation
-static int callback(void *NotUsed, int argc, char *argv[], char *azColName[]){
-  for (int i = 0; i<argc; i++){
-    printf("%s = %s\n", azColName[i], argv[i] ? argv[i] : "NULL");
-  }
-  printf("\n");
-  return 0;
-}
+// Callback function executed for each row returned by the query
+static int callback(void *NotUsed, int argc, char **argv, char **azColName) {
+    static int first_row = 1;
+    
+    // Print column names only for the first row
+    if (first_row) {
+        printf("%-9s", azColName[0]);
+        for (int i = 1; i < argc; i++) {
+            printf("%-25s", azColName[i]);
+        }
+        printf("\n------------------------------------------------------------------------\n");
+        first_row = 0;
+    }
 
+    // Print row data
+    printf("%-9s", argv[0] ? argv[0] : "NULL");
+    for (int i = 1; i < argc; i++) {
+        printf("%-25s", argv[i] ? argv[i] : "NULL");
+    }
+    printf("\n");
+    return 0;
+}
 /** cmd_list
   * this function retrieves the albums table and uses the callback() function
   * in order to print out every entry. 
@@ -315,11 +328,11 @@ int cmd_remove(int id){
   const unsigned char* artist = NULL;
   
   //SQL command to remove entry by ID
-  const char *sql = "DELETE FROM Albums WHERE AlbumID = ?";
+  const char *sql = "DELETE FROM Albums WHERE ID = ?";
   sqlite3_stmt *stmt = NULL;
   
   //Second SQL command for retrieving the name of the album to delete
-  const char *sql2 = "SELECT Title, Artist FROM Albums WHERE AlbumID = ?";
+  const char *sql2 = "SELECT Title, Artist FROM Albums WHERE ID = ?";
   sqlite3_stmt *stmt2 = NULL;
 
   //prepare SQL commands
