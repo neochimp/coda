@@ -297,6 +297,11 @@ int cmd_list(){
 
 }
 
+/** cmd_remove
+  * Searches for entry by ID number, if found, pulls the title and
+  * artist information from that ID number, asks the user for
+  * confirmation and removes it from the table.
+  */
 int cmd_remove(int id){
   sqlite3* db = NULL;
   if(open_current_db(&db) != SQLITE_OK){
@@ -304,6 +309,8 @@ int cmd_remove(int id){
   }
 
   int rc;
+
+  //used to store metadata of the album with matching ID 
   const unsigned char* title = NULL;
   const unsigned char* artist = NULL;
   
@@ -315,13 +322,14 @@ int cmd_remove(int id){
   const char *sql2 = "SELECT Title, Artist FROM Albums WHERE AlbumID = ?";
   sqlite3_stmt *stmt2 = NULL;
 
-  rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL); //make a statement using template
+  //prepare SQL commands
+  rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
   if(rc != SQLITE_OK){
     fprintf(stderr, "Prepare failed: %s\n", sqlite3_errmsg(db));
     sqlite3_close(db);
     return 1;
   }
-  rc = sqlite3_prepare_v2(db, sql2, -1, &stmt2, NULL); //make a statement using template
+  rc = sqlite3_prepare_v2(db, sql2, -1, &stmt2, NULL);
   if(rc != SQLITE_OK){
     fprintf(stderr, "Prepare failed: %s\n", sqlite3_errmsg(db));
     sqlite3_close(db);
@@ -344,6 +352,7 @@ int cmd_remove(int id){
     return 1;
   }
 
+  //Prompt the user if they would like to proceed with deletion
   char choice;
   char line[16];
   while(1){
@@ -355,21 +364,23 @@ int cmd_remove(int id){
         sqlite3_close(db);
         return 1;
     }
-    if(line[0] == '\n') break;
 
+    //break the loop if user doesn't enter anything (default to yes)
+    //or if the user types y or n.
+    if(line[0] == '\n') break;
     choice = tolower((unsigned char)line[0]);
     if(choice == 'y' || choice == 'n') break;
   }
 
   if(choice == 'n'){
-    printf("Cancelling deletion");
+    printf("Cancelling deletion\n");
     sqlite3_finalize(stmt);
     sqlite3_finalize(stmt2);
     sqlite3_close(db);
     return 0;
   }
 
-  rc = sqlite3_step(stmt); //run the filled statement
+  rc = sqlite3_step(stmt); //run the deletion statement
   if (rc != SQLITE_DONE){
     fprintf(stderr, "Deletion failed: %s\n", sqlite3_errmsg(db));
     sqlite3_finalize(stmt); //clean and free the statement
