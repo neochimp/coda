@@ -25,10 +25,10 @@ void usage_info(const char* prog){
   fprintf(stderr,
     "Usage:\n"
     " %s init <database name>.db\n"
-    " %s add [-a album] [-r artist] [-d date]\n"
-    " %s edit <id> [-a album] [-r artist] [-d date]\n"
-    " %s search [-a album] [-r artist]\n"
-    " %s list [-a, --album] [-r, --artist] [-d, --date]\n"
+    " %s add {-a|--album} <name> {-r|--artist} <name> [{-d|--date} <date>]\n"
+    " %s edit <id> [{-a|--album} <name>] [{-r|--artist} <name>] [{-d|--date} <date>]\n"
+    " %s search {-a|--album} <name> | {-r|--artist} <name>\n"
+    " %s list [{-a|--album}] [{-r|--artist}] [{-d|--date}]\n"
     " %s remove <id>\n",
     prog, prog, prog, prog, prog, prog
   );
@@ -134,6 +134,18 @@ int open_current_db(sqlite3** db){
 
 }
 
+/** cmd_init
+  * takes in a string for a database name, currently should
+  * end with .db. Init will attempt to open the database, if 
+  * it doesn't exist yet a new one will be created. It will then
+  * initiatiate a table for the Albums, this is only 
+  * done if the table doesn't already exist.
+  *
+  * init also uses the save_current_db() function to
+  * save the database name to the local .codaconf file
+  * which is later referenced by open_current_db()
+  * 
+*/
 int cmd_init(char* dbName){
   sqlite3* db = NULL;
   char* errMsg = NULL;
@@ -169,15 +181,20 @@ int cmd_init(char* dbName){
   return 0;
 }
 
+/** cmd_add
+  * This function is used to add new entries into the albums table
+  * Currently, only title and artist are mandatory fields, 
+  * the rest can be left blank and will be NULL in the table.
+  */
 int cmd_add(int argc, char *argv[]){
   sqlite3* db = NULL;
   if(open_current_db(&db) != SQLITE_OK){
     return 1;
   }
 
-  char* title = NULL;
-  char* artist = NULL;
-  char* date = NULL;
+  char* title = NULL; //mandatory
+  char* artist = NULL; //mandatory
+  char* date = NULL; //optional
   int opt;
   int rc;
   //processing flags.
@@ -208,7 +225,7 @@ int cmd_add(int argc, char *argv[]){
     return 1;
   }
 
-  //template sql command
+  //template sql command to be populated by sqlite3_bind_text()
   const char *sql = "INSERT INTO ALBUMS (Title, Artist, Date) VALUES (?, ?, ?);";
   sqlite3_stmt *stmt = NULL;
   
@@ -252,6 +269,12 @@ static int callback(void *NotUsed, int argc, char *argv[], char *azColName[]){
   return 0;
 }
 
+/** cmd_list
+  * this function retrieves the albums table and uses the callback() function
+  * in order to print out every entry. 
+  *
+  * TODO: implement sorting by column and improve the printout.
+  */
 int cmd_list(){
   sqlite3* db = NULL;
   if(open_current_db(&db) != SQLITE_OK){
