@@ -2,6 +2,7 @@
 #include <sqlite3.h>
 #include <unistd.h>
 #include <string.h>
+#include <stdlib.h>
 #include "commands.h"
 
 int main(int argc, char *argv[]){
@@ -32,7 +33,7 @@ int main(int argc, char *argv[]){
   }else if(strcmp(argv[1], "search") == 0){
     printf("search not yet implemented");
   }else if(strcmp(argv[1], "remove") == 0){
-    printf("remove not yet implemented");
+    cmd_remove(atoi(argv[2]));
   }
 
   return 0;

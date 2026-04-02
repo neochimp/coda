@@ -1,8 +1,10 @@
 #include "commands.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <sqlite3.h>
 #include <string.h>
 #include <getopt.h>
+#include <ctype.h>
 
 #define CURRENT_CONFIG_FILE ".codaconf"
 #define TEMP_CONFIG_FILE ".codaconf.tmp"
@@ -226,7 +228,7 @@ int cmd_add(int argc, char *argv[]){
   }
 
   //template sql command to be populated by sqlite3_bind_text()
-  const char *sql = "INSERT INTO ALBUMS (Title, Artist, Date) VALUES (?, ?, ?);";
+  const char *sql = "INSERT INTO ALBUMS (Title, Artist, Date) VALUES (?, ?, ?)";
   sqlite3_stmt *stmt = NULL;
   
   rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL); //make a statement using template
@@ -289,6 +291,96 @@ int cmd_list(){
     fprintf(stderr, "SQL error: %s\n", errMsg);
     sqlite3_free(errMsg);
   }
+  sqlite3_close(db);
+
+  return 0;
+
+}
+
+int cmd_remove(int id){
+  sqlite3* db = NULL;
+  if(open_current_db(&db) != SQLITE_OK){
+    return 1;
+  }
+
+  int rc;
+  const unsigned char* title = NULL;
+  const unsigned char* artist = NULL;
+  
+  //SQL command to remove entry by ID
+  const char *sql = "DELETE FROM Albums WHERE AlbumID = ?";
+  sqlite3_stmt *stmt = NULL;
+  
+  //Second SQL command for retrieving the name of the album to delete
+  const char *sql2 = "SELECT Title, Artist FROM Albums WHERE AlbumID = ?";
+  sqlite3_stmt *stmt2 = NULL;
+
+  rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL); //make a statement using template
+  if(rc != SQLITE_OK){
+    fprintf(stderr, "Prepare failed: %s\n", sqlite3_errmsg(db));
+    sqlite3_close(db);
+    return 1;
+  }
+  rc = sqlite3_prepare_v2(db, sql2, -1, &stmt2, NULL); //make a statement using template
+  if(rc != SQLITE_OK){
+    fprintf(stderr, "Prepare failed: %s\n", sqlite3_errmsg(db));
+    sqlite3_close(db);
+    return 1;
+  }
+
+  //bind the id to sql commands
+  sqlite3_bind_int(stmt, 1, id);
+  sqlite3_bind_int(stmt2, 1, id);
+
+  //check to see if there is a valid row with that ID
+  if(sqlite3_step(stmt2) == SQLITE_ROW) {
+    title = sqlite3_column_text(stmt2, 0);
+    artist = sqlite3_column_text(stmt2, 1);
+  }else{
+    printf("No album found with id: %i\n", id);
+    sqlite3_finalize(stmt);
+    sqlite3_finalize(stmt2);
+    sqlite3_close(db);
+    return 1;
+  }
+
+  char choice;
+  char line[16];
+  while(1){
+    printf("Delete %s by %s? [Y/n]: ", title, artist);
+    if (fgets(line, sizeof(line), stdin) == NULL) {
+        printf("Input error.\n");
+        sqlite3_finalize(stmt);
+        sqlite3_finalize(stmt2);
+        sqlite3_close(db);
+        return 1;
+    }
+    if(line[0] == '\n') break;
+
+    choice = tolower((unsigned char)line[0]);
+    if(choice == 'y' || choice == 'n') break;
+  }
+
+  if(choice == 'n'){
+    printf("Cancelling deletion");
+    sqlite3_finalize(stmt);
+    sqlite3_finalize(stmt2);
+    sqlite3_close(db);
+    return 0;
+  }
+
+  rc = sqlite3_step(stmt); //run the filled statement
+  if (rc != SQLITE_DONE){
+    fprintf(stderr, "Deletion failed: %s\n", sqlite3_errmsg(db));
+    sqlite3_finalize(stmt); //clean and free the statement
+    sqlite3_finalize(stmt2);
+    sqlite3_close(db);
+    return 1;
+  }
+
+  printf("Successfully removed %s by %s from collection\n", title, artist);
+  sqlite3_finalize(stmt);
+  sqlite3_finalize(stmt2);
   sqlite3_close(db);
 
   return 0;
