@@ -2,6 +2,7 @@
 #define COMMANDS_H
 
 #include <sqlite3.h>
+#include <getopt.h>
 
 void usage_info(const char *prog);
 int cmd_add(int argc, char *argv[]);

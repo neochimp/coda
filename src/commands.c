@@ -2,23 +2,33 @@
 #include <stdio.h>
 #include <sqlite3.h>
 #include <string.h>
+#include <getopt.h>
 
 #define CURRENT_CONFIG_FILE ".codaconf"
 #define TEMP_CONFIG_FILE ".codaconf.tmp"
+#define BUFFER_SIZE 512
+
+//struct used by getopt_long to have long and short flags
+static struct option long_options[] = {
+  {"album", required_argument, 0, 'a'},
+  {"artist", required_argument, 0, 'r'},
+  {"date", required_argument, 0, 'd'},
+  {0, 0, 0, 0}
+};
 
 /** usage_info
  *  Prints out a generic message about how to use the 
  *  program, this is used as the default message
  *  when an unknown argument is used.
  */
-void usage_info(const char *prog){
+void usage_info(const char* prog){
   fprintf(stderr,
     "Usage:\n"
     " %s init <database name>.db\n"
-    " %s add [-a album] [-A artist] [-d date]\n"
-    " %s edit <id> [-a album] [-A artist] [-d date]\n"
-    " %s search [-a album] [-A artist]\n"
-    " %s list [-a, --album] [-A, --artist] [-d, --Date] \n"
+    " %s add [-a album] [-r artist] [-d date]\n"
+    " %s edit <id> [-a album] [-r artist] [-d date]\n"
+    " %s search [-a album] [-r artist]\n"
+    " %s list [-a, --album] [-r, --artist] [-d, --date]\n"
     " %s remove <id>\n",
     prog, prog, prog, prog, prog, prog
   );
@@ -29,7 +39,7 @@ void usage_info(const char *prog){
   * a local, prenamed, configuration file.
   * Used to reaccess a specifically named database later.
   */
-int save_current_db_name(const char *dbName){
+int save_current_db_name(const char* dbName){
   FILE *in = fopen(CURRENT_CONFIG_FILE, "r");
   FILE *out = fopen(TEMP_CONFIG_FILE, "w");
   char line[1024];
@@ -76,7 +86,7 @@ int save_current_db_name(const char *dbName){
   * an existing database name. 
   * Returns 1 if none exists.
   */
-int load_current_db_name(char *buffer, size_t size){
+int load_current_db_name(char* buffer, size_t size){
   FILE *f = fopen(CURRENT_CONFIG_FILE, "r");
   char line[1024];
   char key[256];
@@ -107,8 +117,8 @@ int load_current_db_name(char *buffer, size_t size){
  *  This should be used at the start of every database command
  *  in order to ensure you are working in the correct database.
   */
-int open_current_db(sqlite3 **db){
-  char dbName[512];
+int open_current_db(sqlite3** db){
+  char dbName[BUFFER_SIZE];
   if(load_current_db_name(dbName, sizeof(dbName)) != 0){
     fprintf(stderr, "No database selected. Run init first.\n");
     return 1;
@@ -124,7 +134,7 @@ int open_current_db(sqlite3 **db){
 
 }
 
-int cmd_init(char *dbName){
+int cmd_init(char* dbName){
   sqlite3* db = NULL;
   char* errMsg = NULL;
 
@@ -148,7 +158,6 @@ int cmd_init(char *dbName){
     sqlite3_close(db);
     return rc;
   }
-
   sqlite3_close(db);
 
   if(save_current_db_name(dbName) != 0){
@@ -160,4 +169,105 @@ int cmd_init(char *dbName){
   return 0;
 }
 
+int cmd_add(int argc, char *argv[]){
+  sqlite3* db = NULL;
+  if(open_current_db(&db) != SQLITE_OK){
+    return 1;
+  }
 
+  char* title = NULL;
+  char* artist = NULL;
+  char* date = NULL;
+  int opt;
+  int rc;
+  //processing flags.
+  while ((opt = getopt_long(argc, argv, "a:r:d:",long_options, NULL)) != -1){
+    switch(opt){
+      case 'a':
+        title = optarg;
+        break;
+
+      case 'r':
+        artist = optarg;
+        break;
+
+      case 'd':
+        date = optarg;
+        break;
+
+      default:
+        fprintf(stderr, 
+                "Usage: %s {-a|--album} <name> {-r|--artist} <name> [{-d|--date} <date>]\n",
+                argv[0]);
+        return 1;
+    }
+  }
+  if (title == NULL || artist == NULL) {
+    fprintf(stderr, "Error: album and artist are required.\n");
+    sqlite3_close(db);
+    return 1;
+  }
+
+  //template sql command
+  const char *sql = "INSERT INTO ALBUMS (Title, Artist, Date) VALUES (?, ?, ?);";
+  sqlite3_stmt *stmt = NULL;
+  
+  rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL); //make a statement using template
+  if(rc != SQLITE_OK){
+    fprintf(stderr, "Prepare failed: %s\n", sqlite3_errmsg(db));
+    sqlite3_close(db);
+    return 1;
+  }
+
+  sqlite3_bind_text(stmt, 1, title, -1, SQLITE_TRANSIENT); //fill slot 1
+  sqlite3_bind_text(stmt, 2, artist, -1, SQLITE_TRANSIENT); //fill slot 2
+
+  if(date){
+    sqlite3_bind_text(stmt, 3, date, -1, SQLITE_TRANSIENT); //if we have date fill 3
+  }else{
+    sqlite3_bind_null(stmt, 3); //if not set it to null
+  }
+
+  rc = sqlite3_step(stmt); //run the filled statement
+  if (rc != SQLITE_DONE){
+    fprintf(stderr, "Insert failed: %s\n", sqlite3_errmsg(db));
+    sqlite3_finalize(stmt); //clean and free the statement
+    sqlite3_close(db);
+    return 1;
+  }
+
+  sqlite3_finalize(stmt);
+  printf("Successfully added %s to collection!\n", title);
+  sqlite3_close(db);
+  
+  return 0;
+}
+
+//sample function from the sqlite documentation
+static int callback(void *NotUsed, int argc, char *argv[], char *azColName[]){
+  for (int i = 0; i<argc; i++){
+    printf("%s = %s\n", azColName[i], argv[i] ? argv[i] : "NULL");
+  }
+  printf("\n");
+  return 0;
+}
+
+int cmd_list(){
+  sqlite3* db = NULL;
+  if(open_current_db(&db) != SQLITE_OK){
+    return 1;
+  }
+
+  const char* sqlCommand = "SELECT * FROM Albums";
+
+  char* errMsg = 0;
+  int rc = sqlite3_exec(db, sqlCommand, callback, 0, &errMsg);
+  if( rc != SQLITE_OK){
+    fprintf(stderr, "SQL error: %s\n", errMsg);
+    sqlite3_free(errMsg);
+  }
+  sqlite3_close(db);
+
+  return 0;
+
+}
