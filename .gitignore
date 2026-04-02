@@ -2,4 +2,4 @@
 .scache/*
 /build
 .vscode/
-.db
+*.db
