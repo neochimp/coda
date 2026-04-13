@@ -33,11 +33,11 @@ Once built, you can use the ```run.sh``` script to interface with the database. 
 | Command | Arguments | Description | Status |
 | ------- | --------- | ----------- | ------ |
 | ```coda init``` | ```<database name>.db``` | This is the first thing you should run when getting started. Here you will name your database whatever you like. The database will be created if one doesn't exist already. You can also use init to switch between different databases if you wish to have multiple collections. | Working |
-| ```coda add``` | ```[-a album] [-A artist] [-d date]``` | This is how you add new items to your collection. You can run this command with the flags in any order you like. Album and Artist name is a required argument but anything else is optional. Currently you can only add whole albums. | WIP |
-| ```coda search``` | ```[-i id] [-a album] [-A artist]``` | This is how you can search for items in your collection. You can choose to use one flag or multiple flags. The function will return a list sorted by search criteria of all matching albums. This is the main way to look up the unique ID of items in your collection in order to manipulate them with other commands | WIP |
-| ```coda edit``` | ```<id> [-a album], [-A artist], [-d date]``` | This is how you can update an existing entry with new or missing information. You need the unique ID of the album to edit. This command accepts singular or multiple flags. | WIP |
-| ```coda list``` | ```[-a, --album], [-A, --artist], [-d, --date]```| This command prints out a sorted list of your entire collection. A flag is optional if you'd like to sort by a specific category. | WIP |
-| ```coda remove``` | ```<id>``` | Remove an item from collection by ID number | WIP |
+| ```coda add``` | ```{-a\|--album} <name> {-r\|--artist} <name> [{-d\|--date} <date>]``` | This is how you add new items to your collection. You can run this command with the flags in any order you like. Album and Artist name is a required argument but anything else is optional. Currently you can only add whole albums. | Working |
+| ```coda search``` | ```[{-i\|--id} <ID>] [{-a\|--album} <name>] [{-r\|--artist} <name>] [{-d\|--date} <date>]``` | This is how you can search for items in your collection. You can choose to use one flag or multiple flags. The function will return a list sorted by search criteria of all matching albums. This is the main way to look up the unique ID of items in your collection in order to manipulate them with other commands | WIP |
+| ```coda edit``` | ```<id> [{-a\|--album} <name>] [{-r\|--artist} <name>] [{-d\|--date} <date>]``` | This is how you can update an existing entry with new or missing information. You need the unique ID of the album to edit. This command accepts singular or multiple flags. | WIP |
+| ```coda list``` | ```[{-a\|--album} <name>] [{-r\|--artist} <name>] [{-d\|--date} <date>]```| This command prints out a sorted list of your entire collection. A flag is optional if you'd like to sort by a specific category. | Partial |
+| ```coda remove``` | ```<id>``` | Remove an item from collection by ID number | Working |
 
 ### Configuration
 
