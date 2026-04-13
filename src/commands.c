@@ -5,9 +5,21 @@
 #include <string.h>
 #include <getopt.h>
 #include <ctype.h>
+#include <errno.h>
+
+#ifdef _WIN32
+#include <direct.h>
+#define MAKE_DIR(path) _mkdir(path)
+#else
+#include <sys/stat.h>
+#include <sys/types.h>
+#define MAKE_DIR(path) mkdir(path, 0755)
+#endif
+
 
 #define CURRENT_CONFIG_FILE ".codaconf"
 #define TEMP_CONFIG_FILE ".codaconf.tmp"
+#define DB_DIRECTORY "databases/"
 #define BUFFER_SIZE 512
 
 //struct used by getopt_long to have long and short flags
@@ -136,6 +148,21 @@ int open_current_db(sqlite3** db){
 
 }
 
+/** Helper function for
+ * creating a directory for
+ * databases if it doesnt already
+ * exist. (cross comaptible)
+ */
+int ensure_db_directory_exists(void){
+  if (MAKE_DIR(DB_DIRECTORY) == 0) {
+    return 0;
+  }
+  if (errno == EEXIST) {
+    return 0;
+  }
+  perror("mkdir");
+  return 1;
+}
 /** cmd_init
   * takes in a string for a database name, currently should
   * end with .db. Init will attempt to open the database, if 
@@ -151,8 +178,12 @@ int open_current_db(sqlite3** db){
 int cmd_init(char* dbName){
   sqlite3* db = NULL;
   char* errMsg = NULL;
+ 
+  ensure_db_directory_exists();
 
-  int rc = sqlite3_open(dbName, &db);
+  char filepath[BUFFER_SIZE];
+  snprintf(filepath, sizeof(filepath), "%s%s", DB_DIRECTORY, dbName);
+  int rc = sqlite3_open(filepath, &db);
   if(rc != SQLITE_OK){
     fprintf(stderr, "Cannot open database '%s': %s\n", dbName, sqlite3_errmsg(db));
     if(db) sqlite3_close(db);
@@ -174,7 +205,7 @@ int cmd_init(char* dbName){
   }
   sqlite3_close(db);
 
-  if(save_current_db_name(dbName) != 0){
+  if(save_current_db_name(filepath) != 0){
     fprintf(stderr, "Failed to save current database name.\n");
     return 1;
   }
