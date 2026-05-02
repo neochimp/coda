@@ -36,14 +36,14 @@ static struct option long_options[] = {
  *  program, this is used as the default message
  *  when an unknown argument is used.
  */
-void usage_info(const char* prog){
+void usage_info(const char* prog) {
   fprintf(stderr,
     "Usage:\n"
     " %s init <database name>.db\n"
-    " %s add {-a|--album} <name> {-r|--artist} <name> [{-d|--date} <date>]\n"
-    " %s edit <id> [{-a|--album} <name>] [{-r|--artist} <name>] [{-d|--date} <date>]\n"
-    " %s search {-a|--album} <name> | {-r|--artist} <name>\n"
-    " %s list [{-a|--album}] [{-r|--artist}] [{-d|--date}]\n"
+    " %s add {-t|--title} <name> {-a|--artist} <name> [{-d|--date} <date>]\n"
+    " %s edit <id> [{-t|--title} <name>] [{-a|--artist} <name>] [{-d|--date} <date>]\n"
+    " %s search {-t|--title} <name> | {-a|--artist} <name>\n"
+    " %s list [{-t|--title}] [{-a|--artist}] [{-d|--date}]\n"
     " %s remove <id>\n",
     prog, prog, prog, prog, prog, prog
   );
@@ -54,7 +54,7 @@ void usage_info(const char* prog){
   * a local, prenamed, configuration file.
   * Used to reaccess a specifically named database later.
   */
-int save_current_db_name(const char* dbName) {
+int save_current_db_name(const char* db_name) {
   FILE *in = fopen(CURRENT_CONFIG_FILE, "r");
   FILE *out = fopen(TEMP_CONFIG_FILE, "w");
   char line[BUFFER_SIZE];
@@ -69,7 +69,7 @@ int save_current_db_name(const char* dbName) {
   if (in) {
     while (fgets(line, sizeof(line), in)) {
       if (strncmp(line, "CURRENT_DB", 10) == 0) {
-        fprintf(out, "CURRENT_DB %s\n", dbName);
+        fprintf(out, "CURRENT_DB %s\n", db_name);
         found = 1;
       } else {
         fputs(line, out);
@@ -79,7 +79,7 @@ int save_current_db_name(const char* dbName) {
   }
 
   if (!found) {
-    fprintf(out, "CURRENT_DB %s\n", dbName);
+    fprintf(out, "CURRENT_DB %s\n", db_name);
   }
 
   fclose(out);
@@ -133,15 +133,15 @@ int load_current_db_name(char* buffer, size_t size) {
  *  in order to ensure you are working in the correct database.
   */
 int open_current_db(sqlite3** db) {
-  char dbName[BUFFER_SIZE];
-  if (load_current_db_name(dbName, sizeof(dbName)) != 0) {
+  char db_name[BUFFER_SIZE];
+  if (load_current_db_name(db_name, sizeof(db_name)) != 0) {
     fprintf(stderr, "No database selected. Run init first.\n");
     return 1;
   }
 
-  int rc = sqlite3_open(dbName, db);
+  int rc = sqlite3_open(db_name, db);
   if (rc != SQLITE_OK) {
-    fprintf(stderr, "Can't open database '%s': %s\n", dbName, sqlite3_errmsg(*db));
+    fprintf(stderr, "Can't open database '%s': %s\n", db_name, sqlite3_errmsg(*db));
     if (*db) sqlite3_close(*db);
     return rc;
   }
@@ -176,17 +176,17 @@ int ensure_db_directory_exists(void) {
   * which is later referenced by open_current_db()
   * 
 */
-int cmd_init(char* dbName) {
+int cmd_init(char* db_name) {
   sqlite3* db = NULL;
-  char* errMsg = NULL;
+  char* err_msg = NULL;
  
   ensure_db_directory_exists();
 
   char filepath[BUFFER_SIZE];
-  snprintf(filepath, sizeof(filepath), "%s%s", DB_DIRECTORY, dbName);
+  snprintf(filepath, sizeof(filepath), "%s%s", DB_DIRECTORY, db_name);
   int rc = sqlite3_open(filepath, &db);
   if (rc != SQLITE_OK) {
-    fprintf(stderr, "Cannot open database '%s': %s\n", dbName, sqlite3_errmsg(db));
+    fprintf(stderr, "Cannot open database '%s': %s\n", db_name, sqlite3_errmsg(db));
     if (db) sqlite3_close(db);
     return rc;
   }
@@ -197,10 +197,10 @@ int cmd_init(char* dbName) {
                                   "Artist TEXT NOT NULL, "
                                   "Date DATE);";
 
-  rc = sqlite3_exec(db, sql_create_table, NULL, 0, &errMsg);
+  rc = sqlite3_exec(db, sql_create_table, NULL, 0, &err_msg);
   if (rc != SQLITE_OK) {
-    fprintf(stderr, "Error Creating Table %s\n", errMsg);
-    sqlite3_free(errMsg);
+    fprintf(stderr, "Error Creating Table %s\n", err_msg);
+    sqlite3_free(err_msg);
     sqlite3_close(db);
     return rc;
   }
@@ -211,7 +211,7 @@ int cmd_init(char* dbName) {
     return 1;
   }
 
-  printf("Initialized and selected database: %s\n", dbName);
+  printf("Initialized and selected database: %s\n", db_name);
   return 0;
 }
 
@@ -248,13 +248,13 @@ int cmd_add(int argc, char *argv[]) {
 
       default:
         fprintf(stderr, 
-                "Usage: %s {-a|--album} <name> {-r|--artist} <name> [{-d|--date} <date>]\n",
+                "Usage: %s {-a|--title} <name> {-r|--artist} <name> [{-d|--date} <date>]\n",
                 argv[0]);
         return 1;
     }
   }
   if (title == NULL || artist == NULL) {
-    fprintf(stderr, "Error: album and artist are required.\n");
+    fprintf(stderr, "Error: title and artist are required.\n");
     sqlite3_close(db);
     return 1;
   }
@@ -321,6 +321,7 @@ static int callback(void *NotUsed, int argc, char **argv, char **azColName) {
   * in order to print out every entry. 
   *
   * TODO: implement sorting by column and improve the printout.
+  * TODO implement showing/hiding certain columns  
   */
 int cmd_list() {
   sqlite3* db = NULL;
@@ -330,11 +331,11 @@ int cmd_list() {
 
   const char* sqlCommand = "SELECT * FROM Albums";
 
-  char* errMsg = 0;
-  int rc = sqlite3_exec(db, sqlCommand, callback, 0, &errMsg);
+  char* err_msg = 0;
+  int rc = sqlite3_exec(db, sqlCommand, callback, 0, &err_msg);
   if ( rc != SQLITE_OK) {
-    fprintf(stderr, "SQL error: %s\n", errMsg);
-    sqlite3_free(errMsg);
+    fprintf(stderr, "SQL error: %s\n", err_msg);
+    sqlite3_free(err_msg);
   }
   sqlite3_close(db);
 
@@ -442,3 +443,114 @@ int cmd_remove(int id) {
   return 0;
 
 }
+
+/** cmd_edit 
+  * This command changes one or more values in a given database entry
+  * based on ID. Flags are used to determine which values to change
+  */
+int cmd_edit(int argc, char *argv[]) {
+ sqlite3* db = NULL;
+  if (open_current_db(&db) != SQLITE_OK) {
+    return 1;
+  }
+  
+  int id;
+  char* new_title = NULL;
+  char* new_artist = NULL;
+  char* new_date = NULL;
+  const unsigned char* old_title = NULL;
+  const unsigned char* old_artist = NULL;
+
+  int opt;
+  int rc;
+
+  //processing flags.
+  while ((opt = getopt_long(argc, argv, "t:a:d:",long_options, NULL)) != -1) {
+    switch (opt) {
+      case 't':
+        new_title = optarg;
+        break;
+
+      case 'a':
+        new_artist = optarg;
+        break;
+
+      case 'd':
+        new_date = optarg;
+        break;
+
+      default:
+        fprintf(stderr, 
+                "Usage: %s <id> {-t|--title} <title> {-a|--artist} <name> [{-d|--date} <date>]\n",
+                argv[0]);
+        return 1;
+    }
+  } 
+
+  if (optind+1 >= argc) {
+    fprintf(stderr, "ID required\n");
+    return 1;
+  } else {
+    id = atoi(argv[optind+1]);
+  }
+
+  //check for errors 
+  if (id <= 0) {
+    fprintf(stderr, "Invalid ID\n");
+    return 1;
+  } else {
+    //SQL command for retrieving the album by ID
+    const char *sql_select = "SELECT Title, Artist FROM Albums WHERE ID = ?";
+    sqlite3_stmt *stmt_select = NULL;
+    rc = sqlite3_prepare_v2(db, sql_select, -1, &stmt_select, NULL);
+    if (rc != SQLITE_OK) {
+      fprintf(stderr, "Prepare failed: %s\n", sqlite3_errmsg(db));
+      sqlite3_close(db);
+      return 1;       
+    }
+    sqlite3_bind_int(stmt_select, 1, id);
+
+    //check to see if there is a valid row with that ID
+    if (sqlite3_step(stmt_select) == SQLITE_ROW) {
+      old_title = sqlite3_column_text(stmt_select, 0);
+      old_artist = sqlite3_column_text(stmt_select, 1);
+    } else {
+      printf("No album found with id: %i\n", id);
+      sqlite3_finalize(stmt_select);
+      sqlite3_close(db);
+      return 1;
+    }
+
+  }
+  
+  //Update title
+  if (new_title) {
+    const char *sql = "UPDATE Albums SET title = ? WHERE ID = ?";
+    sqlite3_stmt *stmt = NULL;
+    rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+      fprintf(stderr, "Prepare failed: %s\n", sqlite3_errmsg(db));
+      sqlite3_close(db);
+      return 1; 
+    }
+    //bind the id to sql commands
+    sqlite3_bind_text(stmt, 1, new_title, -1, SQLITE_TRANSIENT); //fill slot 1
+    sqlite3_bind_int(stmt, 2, id);
+    
+    //trigger the sql command
+    if (sqlite3_step(stmt) == SQLITE_DONE) {
+      printf("Updated Album ID %d title: \"%s\" -> \"%s\"\n", id, old_title, new_title);
+    } else { 
+      fprintf(stderr, "Update failed: %s\n", sqlite3_errmsg(db));
+      sqlite3_finalize(stmt);
+      sqlite3_close(db);
+      return 1;
+    }
+    sqlite3_finalize(stmt);
+  }
+
+  sqlite3_close(db);
+  return 0;
+
+}
+

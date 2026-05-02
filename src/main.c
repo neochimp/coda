@@ -8,8 +8,8 @@
 int main(int argc, char *argv[]){
   //Arguments:
   //-h, --help: description and flags available
-  //-a, --album
-  //-r, --artist
+  //-t, --title
+  //-a, --artist
   //-d, --date YYYY-MM-DD
   
   if(argc < 2){
@@ -29,7 +29,7 @@ int main(int argc, char *argv[]){
       cmd_init("coda.db");
     }
   }else if(strcmp(argv[1], "edit") == 0){
-    printf("edit not yet implemented");
+    cmd_edit(argc, argv);
   }else if(strcmp(argv[1], "search") == 0){
     printf("search not yet implemented");
   }else if(strcmp(argv[1], "remove") == 0){
