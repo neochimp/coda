@@ -21,11 +21,12 @@
 #define TEMP_CONFIG_FILE ".codaconf.tmp"
 #define DB_DIRECTORY "databases/"
 #define BUFFER_SIZE 512
+#define KEY_SIZE 254
 
 //struct used by getopt_long to have long and short flags
 static struct option long_options[] = {
-  {"album", required_argument, 0, 'a'},
-  {"artist", required_argument, 0, 'r'},
+  {"title", required_argument, 0, 't'},
+  {"artist", required_argument, 0, 'a'},
   {"date", required_argument, 0, 'd'},
   {0, 0, 0, 0}
 };
@@ -53,41 +54,41 @@ void usage_info(const char* prog){
   * a local, prenamed, configuration file.
   * Used to reaccess a specifically named database later.
   */
-int save_current_db_name(const char* dbName){
+int save_current_db_name(const char* dbName) {
   FILE *in = fopen(CURRENT_CONFIG_FILE, "r");
   FILE *out = fopen(TEMP_CONFIG_FILE, "w");
-  char line[1024];
+  char line[BUFFER_SIZE];
   int found = 0;
 
   if (!out) {
     perror("fopen temp file");
-    if(in) fclose(in);
+    if (in) fclose(in);
     return 1;
   }
 
-  if(in){
-    while(fgets(line, sizeof(line), in)){
-      if(strncmp(line, "CURRENT_DB", 10) == 0){
+  if (in) {
+    while (fgets(line, sizeof(line), in)) {
+      if (strncmp(line, "CURRENT_DB", 10) == 0) {
         fprintf(out, "CURRENT_DB %s\n", dbName);
         found = 1;
-      }else{
+      } else {
         fputs(line, out);
       }
     }
     fclose(in);
   }
 
-  if(!found){
+  if (!found) {
     fprintf(out, "CURRENT_DB %s\n", dbName);
   }
 
   fclose(out);
 
-  if(remove(CURRENT_CONFIG_FILE) != 0){
+  if (remove(CURRENT_CONFIG_FILE) != 0) {
     //ignore error if file doesn't exist
   }
 
-  if(rename(TEMP_CONFIG_FILE, CURRENT_CONFIG_FILE) != 0){
+  if (rename(TEMP_CONFIG_FILE, CURRENT_CONFIG_FILE)  != 0) {
     perror("rename");
     return 1;
   }
@@ -100,19 +101,19 @@ int save_current_db_name(const char* dbName){
   * an existing database name. 
   * Returns 1 if none exists.
   */
-int load_current_db_name(char* buffer, size_t size){
+int load_current_db_name(char* buffer, size_t size) {
   FILE *f = fopen(CURRENT_CONFIG_FILE, "r");
-  char line[1024];
-  char key[256];
-  char value[768];
+  char line[BUFFER_SIZE];
+  char key[KEY_SIZE];
+  char value[BUFFER_SIZE];
 
-  if (!f){
+  if (!f) {
     return 1;
   }
 
-  while(fgets(line, sizeof(line), f)){
-    if(sscanf(line, "%255s %767s", key, value) == 2){
-      if(strcmp(key, "CURRENT_DB") == 0){
+  while (fgets(line, sizeof(line), f)) {
+    if (sscanf(line, "%255s %511s", key, value) == 2) {
+      if (strcmp(key, "CURRENT_DB") == 0) {
         strncpy(buffer, value, size - 1);
         buffer[size - 1] = '\0';
         fclose(f);
@@ -131,15 +132,15 @@ int load_current_db_name(char* buffer, size_t size){
  *  This should be used at the start of every database command
  *  in order to ensure you are working in the correct database.
   */
-int open_current_db(sqlite3** db){
+int open_current_db(sqlite3** db) {
   char dbName[BUFFER_SIZE];
-  if(load_current_db_name(dbName, sizeof(dbName)) != 0){
+  if (load_current_db_name(dbName, sizeof(dbName)) != 0) {
     fprintf(stderr, "No database selected. Run init first.\n");
     return 1;
   }
 
   int rc = sqlite3_open(dbName, db);
-  if(rc != SQLITE_OK){
+  if (rc != SQLITE_OK) {
     fprintf(stderr, "Can't open database '%s': %s\n", dbName, sqlite3_errmsg(*db));
     if (*db) sqlite3_close(*db);
     return rc;
@@ -153,7 +154,7 @@ int open_current_db(sqlite3** db){
  * databases if it doesnt already
  * exist. (cross comaptible)
  */
-int ensure_db_directory_exists(void){
+int ensure_db_directory_exists(void) {
   if (MAKE_DIR(DB_DIRECTORY) == 0) {
     return 0;
   }
@@ -175,7 +176,7 @@ int ensure_db_directory_exists(void){
   * which is later referenced by open_current_db()
   * 
 */
-int cmd_init(char* dbName){
+int cmd_init(char* dbName) {
   sqlite3* db = NULL;
   char* errMsg = NULL;
  
@@ -184,9 +185,9 @@ int cmd_init(char* dbName){
   char filepath[BUFFER_SIZE];
   snprintf(filepath, sizeof(filepath), "%s%s", DB_DIRECTORY, dbName);
   int rc = sqlite3_open(filepath, &db);
-  if(rc != SQLITE_OK){
+  if (rc != SQLITE_OK) {
     fprintf(stderr, "Cannot open database '%s': %s\n", dbName, sqlite3_errmsg(db));
-    if(db) sqlite3_close(db);
+    if (db) sqlite3_close(db);
     return rc;
   }
 
@@ -197,7 +198,7 @@ int cmd_init(char* dbName){
                                   "Date DATE);";
 
   rc = sqlite3_exec(db, sql_create_table, NULL, 0, &errMsg);
-  if(rc != SQLITE_OK){
+  if (rc != SQLITE_OK) {
     fprintf(stderr, "Error Creating Table %s\n", errMsg);
     sqlite3_free(errMsg);
     sqlite3_close(db);
@@ -205,7 +206,7 @@ int cmd_init(char* dbName){
   }
   sqlite3_close(db);
 
-  if(save_current_db_name(filepath) != 0){
+  if (save_current_db_name(filepath) != 0) {
     fprintf(stderr, "Failed to save current database name.\n");
     return 1;
   }
@@ -219,9 +220,9 @@ int cmd_init(char* dbName){
   * Currently, only title and artist are mandatory fields, 
   * the rest can be left blank and will be NULL in the table.
   */
-int cmd_add(int argc, char *argv[]){
+int cmd_add(int argc, char *argv[]) {
   sqlite3* db = NULL;
-  if(open_current_db(&db) != SQLITE_OK){
+  if (open_current_db(&db) != SQLITE_OK) {
     return 1;
   }
 
@@ -231,13 +232,13 @@ int cmd_add(int argc, char *argv[]){
   int opt;
   int rc;
   //processing flags.
-  while ((opt = getopt_long(argc, argv, "a:r:d:",long_options, NULL)) != -1){
-    switch(opt){
-      case 'a':
+  while ((opt = getopt_long(argc, argv, "t:a:d:",long_options, NULL)) != -1) {
+    switch (opt) {
+      case 't':
         title = optarg;
         break;
 
-      case 'r':
+      case 'a':
         artist = optarg;
         break;
 
@@ -263,7 +264,7 @@ int cmd_add(int argc, char *argv[]){
   sqlite3_stmt *stmt = NULL;
   
   rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL); //make a statement using template
-  if(rc != SQLITE_OK){
+  if (rc != SQLITE_OK) {
     fprintf(stderr, "Prepare failed: %s\n", sqlite3_errmsg(db));
     sqlite3_close(db);
     return 1;
@@ -272,14 +273,14 @@ int cmd_add(int argc, char *argv[]){
   sqlite3_bind_text(stmt, 1, title, -1, SQLITE_TRANSIENT); //fill slot 1
   sqlite3_bind_text(stmt, 2, artist, -1, SQLITE_TRANSIENT); //fill slot 2
 
-  if(date){
+  if (date) {
     sqlite3_bind_text(stmt, 3, date, -1, SQLITE_TRANSIENT); //if we have date fill 3
-  }else{
-    sqlite3_bind_null(stmt, 3); //if not set it to null
+  } else {
+    sqlite3_bind_null(stmt, 3) ; //if not set it to null
   }
 
   rc = sqlite3_step(stmt); //run the filled statement
-  if (rc != SQLITE_DONE){
+  if (rc != SQLITE_DONE) {
     fprintf(stderr, "Insert failed: %s\n", sqlite3_errmsg(db));
     sqlite3_finalize(stmt); //clean and free the statement
     sqlite3_close(db);
@@ -321,9 +322,9 @@ static int callback(void *NotUsed, int argc, char **argv, char **azColName) {
   *
   * TODO: implement sorting by column and improve the printout.
   */
-int cmd_list(){
+int cmd_list() {
   sqlite3* db = NULL;
-  if(open_current_db(&db) != SQLITE_OK){
+  if (open_current_db(&db) != SQLITE_OK) {
     return 1;
   }
 
@@ -331,7 +332,7 @@ int cmd_list(){
 
   char* errMsg = 0;
   int rc = sqlite3_exec(db, sqlCommand, callback, 0, &errMsg);
-  if( rc != SQLITE_OK){
+  if ( rc != SQLITE_OK) {
     fprintf(stderr, "SQL error: %s\n", errMsg);
     sqlite3_free(errMsg);
   }
@@ -346,9 +347,9 @@ int cmd_list(){
   * artist information from that ID number, asks the user for
   * confirmation and removes it from the table.
   */
-int cmd_remove(int id){
+int cmd_remove(int id) {
   sqlite3* db = NULL;
-  if(open_current_db(&db) != SQLITE_OK){
+  if (open_current_db(&db) != SQLITE_OK) {
     return 1;
   }
 
@@ -368,13 +369,13 @@ int cmd_remove(int id){
 
   //prepare SQL commands
   rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
-  if(rc != SQLITE_OK){
+  if (rc != SQLITE_OK) {
     fprintf(stderr, "Prepare failed: %s\n", sqlite3_errmsg(db));
     sqlite3_close(db);
     return 1;
   }
   rc = sqlite3_prepare_v2(db, sql2, -1, &stmt2, NULL);
-  if(rc != SQLITE_OK){
+  if (rc != SQLITE_OK) {
     fprintf(stderr, "Prepare failed: %s\n", sqlite3_errmsg(db));
     sqlite3_close(db);
     return 1;
@@ -385,10 +386,10 @@ int cmd_remove(int id){
   sqlite3_bind_int(stmt2, 1, id);
 
   //check to see if there is a valid row with that ID
-  if(sqlite3_step(stmt2) == SQLITE_ROW) {
+  if (sqlite3_step(stmt2) == SQLITE_ROW) {
     title = sqlite3_column_text(stmt2, 0);
     artist = sqlite3_column_text(stmt2, 1);
-  }else{
+  } else {
     printf("No album found with id: %i\n", id);
     sqlite3_finalize(stmt);
     sqlite3_finalize(stmt2);
@@ -399,7 +400,7 @@ int cmd_remove(int id){
   //Prompt the user if they would like to proceed with deletion
   char choice;
   char line[16];
-  while(1){
+  while (1) {
     printf("Delete %s by %s? [Y/n]: ", title, artist);
     if (fgets(line, sizeof(line), stdin) == NULL) {
         printf("Input error.\n");
@@ -411,12 +412,12 @@ int cmd_remove(int id){
 
     //break the loop if user doesn't enter anything (default to yes)
     //or if the user types y or n.
-    if(line[0] == '\n') break;
+    if (line[0] == '\n') break;
     choice = tolower((unsigned char)line[0]);
-    if(choice == 'y' || choice == 'n') break;
+    if (choice == 'y' || choice == 'n') break;
   }
 
-  if(choice == 'n'){
+  if (choice == 'n') {
     printf("Cancelling deletion\n");
     sqlite3_finalize(stmt);
     sqlite3_finalize(stmt2);
@@ -425,7 +426,7 @@ int cmd_remove(int id){
   }
 
   rc = sqlite3_step(stmt); //run the deletion statement
-  if (rc != SQLITE_DONE){
+  if (rc != SQLITE_DONE) {
     fprintf(stderr, "Deletion failed: %s\n", sqlite3_errmsg(db));
     sqlite3_finalize(stmt); //clean and free the statement
     sqlite3_finalize(stmt2);
