@@ -152,7 +152,7 @@ int open_current_db(sqlite3** db) {
 /** Helper function for
  * creating a directory for
  * databases if it doesnt already
- * exist. (cross comaptible)
+ * exist. (cross compatible)
  */
 int ensure_db_directory_exists(void) {
   if (MAKE_DIR(DB_DIRECTORY) == 0) {
@@ -164,6 +164,40 @@ int ensure_db_directory_exists(void) {
   perror("mkdir");
   return 1;
 }
+
+/** Helper function for getting an album
+  * Retrieves the album with matching id and populates
+  * an album struct that is passed in by pointer
+  *
+  * returns 1 on success and 0 on fail.
+  */
+int retrieve_album_by_id(sqlite3* db, Album *select_album, int id){ 
+  //SQL command for retrieving the album by ID
+  const char *sql_select = "SELECT * FROM Albums WHERE ID = ?";
+  sqlite3_stmt *stmt_select = NULL;
+  int rc = sqlite3_prepare_v2(db, sql_select, -1, &stmt_select, NULL);
+  if (rc != SQLITE_OK) {
+    fprintf(stderr, "Prepare failed: %s\n", sqlite3_errmsg(db));
+    return 0;       
+  }
+  sqlite3_bind_int(stmt_select, 1, id);
+
+  if (sqlite3_step(stmt_select) == SQLITE_ROW) {
+    select_album->id = id;
+    select_album->title = strdup((const char *)sqlite3_column_text(stmt_select, 1));
+    select_album->artist = strdup((const char *)sqlite3_column_text(stmt_select, 2));
+    select_album->date = strdup((const char *)sqlite3_column_text(stmt_select, 3));
+  } else {
+    printf("No album found with id: %i\n", id);
+    sqlite3_finalize(stmt_select);
+    return 0;
+  }
+  
+  sqlite3_finalize(stmt_select);
+  return 1;
+}
+
+
 /** cmd_init
   * takes in a string for a database name, currently should
   * end with .db. Init will attempt to open the database, if 
@@ -328,11 +362,16 @@ int cmd_list() {
   if (open_current_db(&db) != SQLITE_OK) {
     return 1;
   }
-
   const char* sqlCommand = "SELECT * FROM Albums";
-
   char* err_msg = 0;
+
+  //
+  const char *filename = sqlite3_db_filename(db, "main");
+  const char *last_slash = strrchr(filename, '/');
+  printf("\n%s:\n", last_slash + 1);
+
   int rc = sqlite3_exec(db, sqlCommand, callback, 0, &err_msg);
+  printf("\n");
   if ( rc != SQLITE_OK) {
     fprintf(stderr, "SQL error: %s\n", err_msg);
     sqlite3_free(err_msg);
@@ -454,13 +493,10 @@ int cmd_edit(int argc, char *argv[]) {
     return 1;
   }
   
-  int id;
-  char* new_title = NULL;
-  char* new_artist = NULL;
-  char* new_date = NULL;
-  const unsigned char* old_title = NULL;
-  const unsigned char* old_artist = NULL;
-  const unsigned char* old_date = NULL;
+  int id; 
+  Album old_album;
+  Album new_album;
+
 
   int opt;
   int rc;
@@ -469,15 +505,15 @@ int cmd_edit(int argc, char *argv[]) {
   while ((opt = getopt_long(argc, argv, "t:a:d:",long_options, NULL)) != -1) {
     switch (opt) {
       case 't':
-        new_title = optarg;
+        new_album.title = optarg;
         break;
 
       case 'a':
-        new_artist = optarg;
+        new_album.artist = optarg;
         break;
 
       case 'd':
-        new_date = optarg;
+        new_album.date = optarg;
         break;
 
       default:
@@ -500,25 +536,8 @@ int cmd_edit(int argc, char *argv[]) {
     fprintf(stderr, "Invalid ID\n");
     return 1;
   } else {
-    //SQL command for retrieving the album by ID
-    const char *sql_select = "SELECT * FROM Albums WHERE ID = ?";
-    sqlite3_stmt *stmt_select = NULL;
-    rc = sqlite3_prepare_v2(db, sql_select, -1, &stmt_select, NULL);
-    if (rc != SQLITE_OK) {
-      fprintf(stderr, "Prepare failed: %s\n", sqlite3_errmsg(db));
-      sqlite3_close(db);
-      return 1;       
-    }
-    sqlite3_bind_int(stmt_select, 1, id);
-
     //check to see if there is a valid row with that ID
-    if (sqlite3_step(stmt_select) == SQLITE_ROW) {
-      old_title = sqlite3_column_text(stmt_select, 1);
-      old_artist = sqlite3_column_text(stmt_select, 2);
-      old_date = sqlite3_column_text(stmt_select, 3);
-    } else {
-      printf("No album found with id: %i\n", id);
-      sqlite3_finalize(stmt_select);
+    if(!retrieve_album_by_id(db, &old_album, id)){
       sqlite3_close(db);
       return 1;
     }
@@ -526,15 +545,15 @@ int cmd_edit(int argc, char *argv[]) {
   }
   
   #define MAYBE_UPDATE(field)                                                                         \
-    if (new_##field) {                                                                                \
+    if (new_album.field) {                                                                            \
       const char *sql = "UPDATE Albums SET " #field " = ? WHERE ID = ?";                              \
       sqlite3_stmt *stmt = NULL;                                                                      \
       rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);                                              \
       if (rc == SQLITE_OK) {                                                                          \
-        sqlite3_bind_text(stmt, 1, new_##field, -1, SQLITE_TRANSIENT);                                \
+        sqlite3_bind_text(stmt, 1, new_album.field, -1, SQLITE_TRANSIENT);                            \
         sqlite3_bind_int(stmt, 2, id);                                                                \
         if (sqlite3_step(stmt) == SQLITE_DONE) {                                                      \
-          printf("Updated Album ID %d " #field ": \"%s\" -> \"%s\"\n", id, old_##field, new_##field); \
+          printf("Updated Album ID %d " #field ": \"%s\" -> \"%s\"\n", id, old_album.field, new_album.field); \
         } else {                                                                                      \
           fprintf(stderr, "Update failed: %s\n", sqlite3_errmsg(db));                                 \
         }                                                                                             \

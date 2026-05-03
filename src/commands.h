@@ -4,6 +4,13 @@
 #include <sqlite3.h>
 #include <getopt.h>
 
+typedef struct {
+  int id;
+  char *title;
+  char *artist;
+  char *date;
+} Album;
+
 void usage_info(const char *prog);
 int cmd_add(int argc, char *argv[]);
 int cmd_search(int argc, char *argv[]);
