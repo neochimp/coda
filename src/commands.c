@@ -1,8 +1,6 @@
 #include "commands.h"
-#include <stdio.h>
+#include "config.h"
 #include <stdlib.h>
-#include <sqlite3.h>
-#include <string.h>
 #include <getopt.h>
 #include <ctype.h>
 #include <errno.h>
@@ -15,13 +13,6 @@
 #include <sys/types.h>
 #define MAKE_DIR(path) mkdir(path, 0755)
 #endif
-
-#define CURRENT_CONFIG_FILE "/home/soup/dev/repos/coda/.codaconf"
-#define TEMP_CONFIG_FILE ".codaconf.tmp"
-#define DB_DIRECTORY "databases/"
-#define DB_PATH_SIZE 1024
-#define BUFFER_SIZE 512
-#define KEY_SIZE 254
 
 //struct used by getopt_long to have long and short flags
 static struct option long_options[] = {
@@ -47,124 +38,6 @@ void usage_info(const char* prog) {
     " %s remove <id>\n",
     prog, prog, prog, prog, prog, prog
   );
-}
-
-/** load_config_value
-  * generic helper for reading config file
-  */
-int load_config_value(const char* wanted_key, char* buffer, size_t size) {
-  FILE *f = fopen(CURRENT_CONFIG_FILE, "r");
-  char line[BUFFER_SIZE];
-  char key[KEY_SIZE];
-  char value[BUFFER_SIZE];
-
-  if (!f) {
-    return 1;
-  }
-
-  while (fgets(line, sizeof(line), f)) {
-    if (sscanf(line, "%253s %511s", key, value) == 2) {
-      if (strcmp(key, wanted_key) == 0) {
-        strncpy(buffer, value, size - 1);
-        buffer[size - 1] = '\0';
-        fclose(f);
-        return 0;
-      }
-    }
-  }
-
-  fclose(f);
-  return 1;
-}
-
-int load_current_db_name(char* buffer, size_t size) {
-  return load_config_value("CURRENT_DB", buffer, size);
-}
-
-int load_db_directory(char* buffer, size_t size){
-  return load_config_value("DB_DIRECTORY", buffer, size);
-}
-
-/** open_current_db
- *  takes in double pointer for a database and assigns it
- *  the database specified by the name saved by cmd_init();
- *  This should be used at the start of every database command
- *  in order to ensure you are working in the correct database.
-  */
-int open_current_db(sqlite3** db) {
-  char db_dir[BUFFER_SIZE];
-  char db_name[BUFFER_SIZE];
-  char filepath[DB_PATH_SIZE];
-
-  if (load_db_directory(db_dir, sizeof(db_dir)) != 0) {
-    fprintf(stderr, "No database directory configured.\n");
-    return 1;
-  }
-  if (load_current_db_name(db_name, sizeof(db_name)) != 0) {
-    fprintf(stderr, "No database selected. Run init first.\n");
-    return 1;
-  }
-
-  snprintf(filepath, sizeof(filepath), "%s/%s", db_dir, db_name);
-
-  int rc = sqlite3_open(filepath, db);
-  if (rc != SQLITE_OK) {
-    fprintf(stderr, "Can't open database '%s': %s\n", filepath, sqlite3_errmsg(*db));
-    if (*db) sqlite3_close(*db);
-    return rc;
-  }
-  return SQLITE_OK;
-
-}
-
-/** save_config_value 
-  * Saves a new config value
-  * a local, prenamed, configuration file.
-  * Used to reaccess a database later.
-  */
-int save_config_value(const char* target_key, const char* target_value) {
-  FILE *in = fopen(CURRENT_CONFIG_FILE, "r");
-  FILE *out = fopen(TEMP_CONFIG_FILE, "w");
-  char line[BUFFER_SIZE];
-  char key[KEY_SIZE];
-  int found = 0;
-
-  if (!out) {
-    perror("fopen temp file");
-    if (in) fclose(in);
-    return 1;
-  }
-
-  if (in) {
-    while (fgets(line, sizeof(line), in)) {
-      if (sscanf(line, "%253s", key) == 1 && strcmp(key, target_key) == 0) {
-        fprintf(out, "%s %s\n", target_key, target_value);
-        found = 1;
-      } else {
-        fputs(line, out);
-      }
-    }
-    fclose(in);
-  }
-
-  if (!found) {
-    fprintf(out, "%s %s\n", target_key, target_value);
-  }
-
-  fclose(out);
-
-  remove(CURRENT_CONFIG_FILE);
-
-  if (rename(TEMP_CONFIG_FILE, CURRENT_CONFIG_FILE)  != 0) {
-    perror("rename");
-    return 1;
-  }
-
-  return 0;
-}
-
-int save_current_db_name(const char* db_name) {
-  return save_config_value("CURRENT_DB", db_name);
 }
 
 /** Helper function for getting an album
@@ -199,8 +72,33 @@ int retrieve_album_by_id(sqlite3* db, Album* select_album, int id) {
   return 1;
 }
 
+//Takes an Album struct and does a simple printout
 void print_album(const Album* album) {
   printf("[%d]: %s, %s, %s\n", album->id, album->title, album->artist, album->date);
+}
+
+// Callback function executed for each row returned by the query
+static int callback(void *NotUsed, int argc, char **argv, char **azColName) {
+    static int first_row = 1;
+    
+    // Print column names only for the first row
+    if (first_row) {
+        printf("%-9s", azColName[0]);
+        for (int i = 1; i < argc; i++) {
+            printf("%-25s", azColName[i]);
+        }
+        printf("\n------------------------------------------------------------------------\n");
+        first_row = 0;
+    }
+
+    // Print row data
+    printf("%-9s", argv[0] ? argv[0] : "NULL");
+    for (int i = 1; i < argc; i++) {
+        printf("%-25s", argv[i] ? argv[i] : "NULL");
+    }
+    printf("\n");
+    return 0;
+
 }
 
 /** cmd_init
@@ -342,34 +240,12 @@ int cmd_add(int argc, char *argv[]) {
   return 0;
 }
 
-// Callback function executed for each row returned by the query
-static int callback(void *NotUsed, int argc, char **argv, char **azColName) {
-    static int first_row = 1;
-    
-    // Print column names only for the first row
-    if (first_row) {
-        printf("%-9s", azColName[0]);
-        for (int i = 1; i < argc; i++) {
-            printf("%-25s", azColName[i]);
-        }
-        printf("\n------------------------------------------------------------------------\n");
-        first_row = 0;
-    }
-
-    // Print row data
-    printf("%-9s", argv[0] ? argv[0] : "NULL");
-    for (int i = 1; i < argc; i++) {
-        printf("%-25s", argv[i] ? argv[i] : "NULL");
-    }
-    printf("\n");
-    return 0;
-}
 /** cmd_list
   * this function retrieves the albums table and uses the callback() function
   * in order to print out every entry. 
   *
   * TODO: implement sorting by column and improve the printout.
-  * TODO implement showing/hiding certain columns  
+  * TODO: implement showing/hiding certain columns  
   */
 int cmd_list() {
   sqlite3* db = NULL;
@@ -509,7 +385,6 @@ int cmd_edit(int argc, char *argv[]) {
   int id; 
   Album old_album = {0};
   Album new_album = {0};
-
 
   int opt;
   int rc;
