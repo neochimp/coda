@@ -58,10 +58,14 @@ int retrieve_album_by_id(sqlite3* db, Album* select_album, int id) {
   sqlite3_bind_int(stmt_select, 1, id);
 
   if (sqlite3_step(stmt_select) == SQLITE_ROW) {
+    const unsigned char *title  = sqlite3_column_text(stmt_select, 1);
+    const unsigned char *artist = sqlite3_column_text(stmt_select, 2);
+    const unsigned char *date   = sqlite3_column_text(stmt_select, 3);
+
     select_album->id = id;
-    select_album->title = strdup((const char *)sqlite3_column_text(stmt_select, 1));
-    select_album->artist = strdup((const char *)sqlite3_column_text(stmt_select, 2));
-    select_album->date = strdup((const char *)sqlite3_column_text(stmt_select, 3));
+    select_album->title  = title  ? strdup((const char *)title)  : NULL;
+    select_album->artist = artist ? strdup((const char *)artist) : NULL;
+    select_album->date   = date   ? strdup((const char *)date)   : NULL;
   } else {
     printf("No album found with id: %i\n", id);
     sqlite3_finalize(stmt_select);
