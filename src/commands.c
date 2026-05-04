@@ -16,10 +16,10 @@
 #define MAKE_DIR(path) mkdir(path, 0755)
 #endif
 
-
-#define CURRENT_CONFIG_FILE ".codaconf"
+#define CURRENT_CONFIG_FILE "/home/soup/dev/repos/coda/.codaconf"
 #define TEMP_CONFIG_FILE ".codaconf.tmp"
 #define DB_DIRECTORY "databases/"
+#define DB_PATH_SIZE 1024
 #define BUFFER_SIZE 512
 #define KEY_SIZE 254
 
@@ -49,59 +49,10 @@ void usage_info(const char* prog) {
   );
 }
 
-/** save_current_db_name 
-  * Saves a given name for a database into
-  * a local, prenamed, configuration file.
-  * Used to reaccess a specifically named database later.
+/** load_config_value
+  * generic helper for reading config file
   */
-int save_current_db_name(const char* db_name) {
-  FILE *in = fopen(CURRENT_CONFIG_FILE, "r");
-  FILE *out = fopen(TEMP_CONFIG_FILE, "w");
-  char line[BUFFER_SIZE];
-  int found = 0;
-
-  if (!out) {
-    perror("fopen temp file");
-    if (in) fclose(in);
-    return 1;
-  }
-
-  if (in) {
-    while (fgets(line, sizeof(line), in)) {
-      if (strncmp(line, "CURRENT_DB", 10) == 0) {
-        fprintf(out, "CURRENT_DB %s\n", db_name);
-        found = 1;
-      } else {
-        fputs(line, out);
-      }
-    }
-    fclose(in);
-  }
-
-  if (!found) {
-    fprintf(out, "CURRENT_DB %s\n", db_name);
-  }
-
-  fclose(out);
-
-  if (remove(CURRENT_CONFIG_FILE) != 0) {
-    //ignore error if file doesn't exist
-  }
-
-  if (rename(TEMP_CONFIG_FILE, CURRENT_CONFIG_FILE)  != 0) {
-    perror("rename");
-    return 1;
-  }
-
-  return 0;
-}
-
-/** load_current_db_name
-  * Reads the prenamed config file for
-  * an existing database name. 
-  * Returns 1 if none exists.
-  */
-int load_current_db_name(char* buffer, size_t size) {
+int load_config_value(const char* wanted_key, char* buffer, size_t size) {
   FILE *f = fopen(CURRENT_CONFIG_FILE, "r");
   char line[BUFFER_SIZE];
   char key[KEY_SIZE];
@@ -112,8 +63,8 @@ int load_current_db_name(char* buffer, size_t size) {
   }
 
   while (fgets(line, sizeof(line), f)) {
-    if (sscanf(line, "%255s %511s", key, value) == 2) {
-      if (strcmp(key, "CURRENT_DB") == 0) {
+    if (sscanf(line, "%253s %511s", key, value) == 2) {
+      if (strcmp(key, wanted_key) == 0) {
         strncpy(buffer, value, size - 1);
         buffer[size - 1] = '\0';
         fclose(f);
@@ -126,6 +77,14 @@ int load_current_db_name(char* buffer, size_t size) {
   return 1;
 }
 
+int load_current_db_name(char* buffer, size_t size) {
+  return load_config_value("CURRENT_DB", buffer, size);
+}
+
+int load_db_directory(char* buffer, size_t size){
+  return load_config_value("DB_DIRECTORY", buffer, size);
+}
+
 /** open_current_db
  *  takes in double pointer for a database and assigns it
  *  the database specified by the name saved by cmd_init();
@@ -133,15 +92,24 @@ int load_current_db_name(char* buffer, size_t size) {
  *  in order to ensure you are working in the correct database.
   */
 int open_current_db(sqlite3** db) {
+  char db_dir[BUFFER_SIZE];
   char db_name[BUFFER_SIZE];
+  char filepath[DB_PATH_SIZE];
+
+  if (load_db_directory(db_dir, sizeof(db_dir)) != 0) {
+    fprintf(stderr, "No database directory configured.\n");
+    return 1;
+  }
   if (load_current_db_name(db_name, sizeof(db_name)) != 0) {
     fprintf(stderr, "No database selected. Run init first.\n");
     return 1;
   }
 
-  int rc = sqlite3_open(db_name, db);
+  snprintf(filepath, sizeof(filepath), "%s/%s", db_dir, db_name);
+
+  int rc = sqlite3_open(filepath, db);
   if (rc != SQLITE_OK) {
-    fprintf(stderr, "Can't open database '%s': %s\n", db_name, sqlite3_errmsg(*db));
+    fprintf(stderr, "Can't open database '%s': %s\n", filepath, sqlite3_errmsg(*db));
     if (*db) sqlite3_close(*db);
     return rc;
   }
@@ -149,20 +117,54 @@ int open_current_db(sqlite3** db) {
 
 }
 
-/** Helper function for
- * creating a directory for
- * databases if it doesnt already
- * exist. (cross compatible)
- */
-int ensure_db_directory_exists(void) {
-  if (MAKE_DIR(DB_DIRECTORY) == 0) {
-    return 0;
+/** save_config_value 
+  * Saves a new config value
+  * a local, prenamed, configuration file.
+  * Used to reaccess a database later.
+  */
+int save_config_value(const char* target_key, const char* target_value) {
+  FILE *in = fopen(CURRENT_CONFIG_FILE, "r");
+  FILE *out = fopen(TEMP_CONFIG_FILE, "w");
+  char line[BUFFER_SIZE];
+  char key[KEY_SIZE];
+  int found = 0;
+
+  if (!out) {
+    perror("fopen temp file");
+    if (in) fclose(in);
+    return 1;
   }
-  if (errno == EEXIST) {
-    return 0;
+
+  if (in) {
+    while (fgets(line, sizeof(line), in)) {
+      if (sscanf(line, "%253s", key) == 1 && strcmp(key, target_key) == 0) {
+        fprintf(out, "%s %s\n", target_key, target_value);
+        found = 1;
+      } else {
+        fputs(line, out);
+      }
+    }
+    fclose(in);
   }
-  perror("mkdir");
-  return 1;
+
+  if (!found) {
+    fprintf(out, "%s %s\n", target_key, target_value);
+  }
+
+  fclose(out);
+
+  remove(CURRENT_CONFIG_FILE);
+
+  if (rename(TEMP_CONFIG_FILE, CURRENT_CONFIG_FILE)  != 0) {
+    perror("rename");
+    return 1;
+  }
+
+  return 0;
+}
+
+int save_current_db_name(const char* db_name) {
+  return save_config_value("CURRENT_DB", db_name);
 }
 
 /** Helper function for getting an album
@@ -171,7 +173,7 @@ int ensure_db_directory_exists(void) {
   *
   * returns 1 on success and 0 on fail.
   */
-int retrieve_album_by_id(sqlite3* db, Album *select_album, int id){ 
+int retrieve_album_by_id(sqlite3* db, Album* select_album, int id) { 
   //SQL command for retrieving the album by ID
   const char *sql_select = "SELECT * FROM Albums WHERE ID = ?";
   sqlite3_stmt *stmt_select = NULL;
@@ -197,6 +199,9 @@ int retrieve_album_by_id(sqlite3* db, Album *select_album, int id){
   return 1;
 }
 
+void print_album(const Album* album) {
+  printf("[%d]: %s, %s, %s\n", album->id, album->title, album->artist, album->date);
+}
 
 /** cmd_init
   * takes in a string for a database name, currently should
@@ -213,11 +218,20 @@ int retrieve_album_by_id(sqlite3* db, Album *select_album, int id){
 int cmd_init(char* db_name) {
   sqlite3* db = NULL;
   char* err_msg = NULL;
+  char db_dir[BUFFER_SIZE];
  
-  ensure_db_directory_exists();
+  if (load_db_directory(db_dir, sizeof(db_dir)) != 0){
+    fprintf(stderr, "DB_DIRECTORY not set in %s\n", CURRENT_CONFIG_FILE);
+    return 1;
+  }
 
-  char filepath[BUFFER_SIZE];
-  snprintf(filepath, sizeof(filepath), "%s%s", DB_DIRECTORY, db_name);
+  if (MAKE_DIR(db_dir) != 0 && errno != EEXIST) {
+    perror("mkdir");
+    return 1;
+  }
+
+  char filepath[DB_PATH_SIZE];
+  snprintf(filepath, sizeof(filepath), "%s/%s", db_dir, db_name);
   int rc = sqlite3_open(filepath, &db);
   if (rc != SQLITE_OK) {
     fprintf(stderr, "Cannot open database '%s': %s\n", db_name, sqlite3_errmsg(db));
@@ -240,7 +254,7 @@ int cmd_init(char* db_name) {
   }
   sqlite3_close(db);
 
-  if (save_current_db_name(filepath) != 0) {
+  if (save_current_db_name(db_name) != 0) {
     fprintf(stderr, "Failed to save current database name.\n");
     return 1;
   }
@@ -368,10 +382,9 @@ int cmd_list() {
   //
   const char *filename = sqlite3_db_filename(db, "main");
   const char *last_slash = strrchr(filename, '/');
-  printf("\n%s:\n", last_slash + 1);
+  printf("%s:\n", last_slash + 1);
 
   int rc = sqlite3_exec(db, sqlCommand, callback, 0, &err_msg);
-  printf("\n");
   if ( rc != SQLITE_OK) {
     fprintf(stderr, "SQL error: %s\n", err_msg);
     sqlite3_free(err_msg);
@@ -494,8 +507,8 @@ int cmd_edit(int argc, char *argv[]) {
   }
   
   int id; 
-  Album old_album;
-  Album new_album;
+  Album old_album = {0};
+  Album new_album = {0};
 
 
   int opt;
@@ -567,6 +580,11 @@ int cmd_edit(int argc, char *argv[]) {
   MAYBE_UPDATE(artist)
   MAYBE_UPDATE(date)
   #undef MAYBE_UPDATE
+
+  Album final;
+  retrieve_album_by_id(db, &final, id);
+  printf("\n");
+  print_album(&final);
    
   sqlite3_close(db);
   return 0;

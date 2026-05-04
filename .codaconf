@@ -1,1 +1,2 @@
-CURRENT_DB databases/test.db
+DB_DIRECTORY /home/soup/dev/repos/coda/databases
+CURRENT_DB test.db
