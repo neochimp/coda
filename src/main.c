@@ -35,6 +35,8 @@ int main(int argc, char *argv[]){
     printf("search not yet implemented");
   }else if(strcmp(argv[1], "remove") == 0){
     cmd_remove(atoi(argv[2]));
+  }else{
+    usage_info(argv[0]);
   }
 
   printf("\n");

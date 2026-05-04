@@ -32,7 +32,7 @@ int load_current_db_name(char* buffer, size_t size) {
   return load_config_value("CURRENT_DB", buffer, size);
 }
 
-int load_db_directory(char* buffer, size_t size){
+int load_db_directory(char* buffer, size_t size) {
   return load_config_value("DB_DIRECTORY", buffer, size);
 }
 

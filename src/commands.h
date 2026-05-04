@@ -19,5 +19,5 @@ int cmd_list();
 int cmd_remove(int id);
 int cmd_init(char *db_name);
 
-int open_current_db(sqlite3 **db);
 #endif
+

@@ -9,7 +9,7 @@ Coda - A personal database for music collectors
 
 ## Info
 
-Coda is a command line application built in C. Under the hood, it uses the SQLite library for information management and searching. Coda is meant to be used as a way to track and browse a personal music collection such as CD's or records.
+Coda is a command line application built in C. Under the hood, it uses the [SQLite](https://sqlite.org/) library for information management and searching. Coda is meant to be used as a way to track and browse a personal music collection such as CD's or records.
 
 ## Background
 This project started because my CD collection started to get unruly and I would find new CD's and forget which ones I already owned. 
@@ -26,7 +26,7 @@ Coda uses a lightweight build tool called [Tiny](https://github.com/JHeflinger/t
 
 ## How To Use
 
-Once built, you can use the ```run.sh``` script to interface with the database. I recommend creating an alias for this for ease of use, for the rest of the documentation I will be referring to the command as ```coda```.
+Once built, you can use the ```run.sh``` script to interface with the database. I recommend creating a symlink for the binary file for ease of use, for the rest of the documentation I will be referring to the command as ```coda```.
 
 ### Commands
 
@@ -35,8 +35,8 @@ Once built, you can use the ```run.sh``` script to interface with the database. 
 | ```coda init``` | ```<database name>.db``` | This is the first thing you should run when getting started. Here you will name your database whatever you like. The database will be created if one doesn't exist already. You can also use init to switch between different databases if you wish to have multiple collections. | Working |
 | ```coda add``` | ```{-a\|--album} <name> {-r\|--artist} <name> [{-d\|--date} <date>]``` | This is how you add new items to your collection. You can run this command with the flags in any order you like. Album and Artist name is a required argument but anything else is optional. Currently you can only add whole albums. | Working |
 | ```coda search``` | ```[{-i\|--id} <ID>] [{-a\|--album} <name>] [{-r\|--artist} <name>] [{-d\|--date} <date>]``` | This is how you can search for items in your collection. You can choose to use one flag or multiple flags. The function will return a list sorted by search criteria of all matching albums. This is the main way to look up the unique ID of items in your collection in order to manipulate them with other commands | WIP |
-| ```coda edit``` | ```<id> [{-a\|--album} <name>] [{-r\|--artist} <name>] [{-d\|--date} <date>]``` | This is how you can update an existing entry with new or missing information. You need the unique ID of the album to edit. This command accepts singular or multiple flags. | WIP |
-| ```coda list``` | ```[{-a\|--album} <name>] [{-r\|--artist} <name>] [{-d\|--date} <date>]```| This command prints out a sorted list of your entire collection. A flag is optional if you'd like to sort by a specific category. | Partial |
+| ```coda edit``` | ```<id> [{-a\|--album} <name>] [{-r\|--artist} <name>] [{-d\|--date} <date>]``` | This is how you can update an existing entry with new or missing information. You need the unique ID of the album to edit. This command accepts singular or multiple flags. | Working |
+| ```coda list``` | ```[{-a\|--album} <name>] [{-r\|--artist} <name>] [{-d\|--date} <date>]```| This command prints out a sorted list of your entire collection. TODO: Optional flag to sort by a specific category. | Partial |
 | ```coda remove``` | ```<id>``` | Remove an item from collection by ID number | Working |
 
 ### Configuration
@@ -46,11 +46,13 @@ Once built, you can use the ```run.sh``` script to interface with the database. 
 | Precursor | Value | Description |
 | --------- | ----- | ----------- |
 | CURRENT_DB | ```<database_name>.db``` | This is the database that you are interfacing with, changing this value is how you can switch between different collections. Using ```code init``` automatically populates this configuration. |
+| DB_DIRECTORY | ```<filepath>``` | This is the directory where you would like to save all of your databases. By default this resides in the coda/databases directory. |
+
 
 ## Future Plans
 
 There are a handful of features which I am not including in the initial release which I'd like to eventually support:
 - Individual Tracks Collection: A way to track individual tracks which automatically connects to your album collection, for those who are especially meticulous.
-- More Metadata!: More optional flags to get even more detailed (e.g. genres, length, record label)
+- More Metadata!: More optional flags to get even more detailed (e.g. genres, length, record label, etc.)
 - Personal Rating System: Rank your collection however you see fit (I really like the way the restaurant review app *Beli* handles this).
 - Mobile/web integration: I personally really want to include a music collection tab on my [personal blog](https://cameron-lee.com/).
