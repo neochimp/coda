@@ -251,12 +251,34 @@ int cmd_add(int argc, char *argv[]) {
   * TODO: implement sorting by column and improve the printout.
   * TODO: implement showing/hiding certain columns  
   */
-int cmd_list() {
+int cmd_list(int argc, char *argv[]) {
   sqlite3* db = NULL;
   if (open_current_db(&db) != SQLITE_OK) {
     return 1;
   }
-  const char* sqlCommand = "SELECT * FROM Albums";
+
+  int opt;
+
+  char* sqlCommand = "SELECT * FROM Albums";
+  //processing flags.
+  while ((opt = getopt_long(argc, argv, "tad",long_options, NULL)) != -1) {
+    switch (opt) {
+      case 't':
+        sqlCommand = "SELECT * FROM Albums ORDER BY Title";
+        break;
+
+      case 'a':
+        sqlCommand = "SELECT * FROM Albums ORDER BY Artist";
+        break;
+
+      case 'd':
+        sqlCommand = "SELECT * FROM Albums ORDER BY date";
+        break;
+
+      default:
+    }
+  }
+
   char* err_msg = 0;
 
   //

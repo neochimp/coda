@@ -36,7 +36,7 @@ Once built, you can use the ```run.sh``` script to interface with the database. 
 | ```coda add``` | ```{-a\|--album} <name> {-r\|--artist} <name> [{-d\|--date} <date>]``` | This is how you add new items to your collection. You can run this command with the flags in any order you like. Album and Artist name is a required argument but anything else is optional. Currently you can only add whole albums. | Working |
 | ```coda search``` | ```[{-i\|--id} <ID>] [{-a\|--album} <name>] [{-r\|--artist} <name>] [{-d\|--date} <date>]``` | This is how you can search for items in your collection. You can choose to use one flag or multiple flags. The function will return a list sorted by search criteria of all matching albums. This is the main way to look up the unique ID of items in your collection in order to manipulate them with other commands | WIP |
 | ```coda edit``` | ```<id> [{-a\|--album} <name>] [{-r\|--artist} <name>] [{-d\|--date} <date>]``` | This is how you can update an existing entry with new or missing information. You need the unique ID of the album to edit. This command accepts singular or multiple flags. | Working |
-| ```coda list``` | ```[{-a\|--album} <name>] [{-r\|--artist} <name>] [{-d\|--date} <date>]```| This command prints out a sorted list of your entire collection. TODO: Optional flag to sort by a specific category. | Partial |
+| ```coda list``` | ```[{-a\|--album} <name>] [{-r\|--artist} <name>] [{-d\|--date} <date>]```| This command prints out a sorted list of your entire collection. Currently supports one optional flag for order, otherwise sorts by ID | Working |
 | ```coda remove``` | ```<id>``` | Remove an item from collection by ID number | Working |
 
 ### Configuration

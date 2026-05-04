@@ -22,7 +22,7 @@ int main(int argc, char *argv[]){
   if(strcmp(argv[1], "add") == 0){
     cmd_add(argc, argv);
   }else if(strcmp(argv[1], "list") == 0){
-    cmd_list();
+    cmd_list(argc, argv);
   }else if(strcmp(argv[1], "init") == 0){
     if(argv[2]){
       cmd_init(argv[2]);
