@@ -18,7 +18,6 @@ int main(int argc, char *argv[]){
     return 1;
   }
 
-  printf("\n");
   if(strcmp(argv[1], "add") == 0){
     cmd_add(argc, argv);
   }else if(strcmp(argv[1], "list") == 0){

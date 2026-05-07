@@ -281,7 +281,7 @@ int cmd_list(int argc, char *argv[]) {
 
   char* err_msg = 0;
 
-  //
+  printf("\n");
   const char *filename = sqlite3_db_filename(db, "main");
   const char *last_slash = strrchr(filename, '/');
   printf("%s:\n", last_slash + 1);
