@@ -56,3 +56,4 @@ There are a handful of features which I am not including in the initial release 
 - More Metadata!: More optional flags to get even more detailed (e.g. genres, length, record label, etc.)
 - Personal Rating System: Rank your collection however you see fit (I really like the way the restaurant review app *Beli* handles this).
 - Mobile/web integration: I personally really want to include a music collection tab on my [personal blog](https://cameron-lee.com/).
+- Syncing with an online API database for quick album metadata retrieval (e.g. Discogs, MusicBrainz, TheAudioDB, etc).
